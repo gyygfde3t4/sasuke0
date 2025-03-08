@@ -12,6 +12,8 @@ import socketserver
 import threading
 import asyncpg
 from asyncpg.pool import Pool
+import psycopg2
+from psycopg2 import sql
 
 # إعداد بيانات الاعتماد الخاصة بك
 API_ID = os.getenv("API_ID")
