@@ -14,6 +14,9 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2 import sql 
 import sys
+import time
+import requests
+
 # إعداد بيانات الاعتماد الخاصة بك
 API_ID = os.getenv("API_ID") 
 API_HASH = os.getenv("API_HASH")
@@ -694,15 +697,31 @@ async def handler(event):
         else:
             await event.reply("⚠️ <b>يرجى إدخال رابط صحيح لمنشور من قناة مقيدة.</b>", parse_mode='html')
 
+# تشغيل خادم HTTP على المنفذ 8000
 def run_server():
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", 8000), handler) as httpd:
         print("Serving on port 8000")
         httpd.serve_forever()
 
+# تشغيل وظيفة keep_alive لإرسال طلبات HTTP دورية
+def keep_alive():
+    while True:
+        try:
+            requests.get("https://chronic-eddie-omarkh7aled-3fa0a11c.koyeb.app/")  # استخدم الرابط الصحيح هنا
+        except Exception as e:
+            print(f"Error in keep_alive: {e}")
+        time.sleep(300)  # انتظر 5 دقائق قبل إرسال الطلب التالي
+
 # تشغيل الخادم في خيط جديد
 server_thread = threading.Thread(target=run_server)
+server_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
 server_thread.start()
+
+# تشغيل وظيفة keep_alive في خيط منفصل
+keep_alive_thread = threading.Thread(target=keep_alive)
+keep_alive_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
+keep_alive_thread.start()
 
 # بدء تشغيل البوت
 while True:
@@ -712,5 +731,4 @@ while True:
         client.run_until_disconnected()
     except Exception as e:
         print(f"Error occurred: {e}")
-        continue
-       
+        continue            
