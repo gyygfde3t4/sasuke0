@@ -708,7 +708,7 @@ def run_server():
 def keep_alive():
     while True:
         try:
-            requests.get("https://chronic-eddie-omarkh7aled-3fa0a11c.koyeb.app/")  # استخدم الرابط الصحيح هنا
+            requests.get("https://chronic-eddie-outer-trista-omarkh7aled-db015e23.koyeb.app/")  # استخدم الرابط الصحيح هنا
         except Exception as e:
             print(f"Error in keep_alive: {e}")
         time.sleep(300)  # انتظر 5 دقائق قبل إرسال الطلب التالي
