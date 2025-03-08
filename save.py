@@ -12,7 +12,7 @@ import socketserver
 import threading
 import psycopg2
 from psycopg2 import pool
-from psycopg2 import sql
+from psycopg2 import sql  # تمت إضافة هذا الاستيراد
 
 # إعداد بيانات الاعتماد الخاصة بك
 API_ID = os.getenv("API_ID") 
@@ -175,7 +175,10 @@ async def show_bot_stats(event):
     buttons = [
         [Button.inline("رجوع ↩️", b'back_to_main')]
     ]
-    await event.edit(stats_message, parse_mode='html', buttons=buttons)
+    try:
+        await event.edit(stats_message, parse_mode='html', buttons=buttons)
+    except telethon.errors.rpcerrorlist.MessageNotModifiedError:
+        pass  # تجاهل الخطأ إذا لم يتم تعديل الرسالة
 
 # إرسال رسالة الأوامر الخاصة بالمطور
 async def send_developer_commands(event):
@@ -237,6 +240,8 @@ Press /help to learn more.
     try:
         # تعديل الرسالة الحالية
         await event.edit(welcome_message, parse_mode='html', buttons=buttons, link_preview=False)
+    except telethon.errors.rpcerrorlist.MessageNotModifiedError:
+        pass  # تجاهل الخطأ إذا لم يتم تعديل الرسالة
     except telethon.errors.rpcerrorlist.MessageIdInvalidError:
         # إذا فشل التعديل، إرسال رسالة جديدة
         await event.reply(welcome_message, parse_mode='html', buttons=buttons, link_preview=False)
@@ -260,6 +265,8 @@ async def send_help_message(event):
     try:
         # تعديل الرسالة الحالية
         await event.edit(help_message, parse_mode='html')
+    except telethon.errors.rpcerrorlist.MessageNotModifiedError:
+        pass  # تجاهل الخطأ إذا لم يتم تعديل الرسالة
     except telethon.errors.rpcerrorlist.MessageIdInvalidError:
         # إذا فشل التعديل، إرسال رسالة جديدة
         await event.reply(help_message, parse_mode='html')
@@ -530,12 +537,15 @@ async def callback_handler(event):
             buttons = [
                 [Button.inline("رجوع ↩️", b'back_to_main')]
             ]
-            await event.edit(
-                "<b>• أرسل الآن الكليشة ( النص أو جميع الوسائط )</b>\n"
-                "<b>• يمكنك استخدام كود جاهز في الإذاعة أو يمكنك استخدام الماركدوان</b>",
-                parse_mode='html',
-                buttons=buttons
-            )
+            try:
+                await event.edit(
+                    "<b>• أرسل الآن الكليشة ( النص أو جميع الوسائط )</b>\n"
+                    "<b>• يمكنك استخدام كود جاهز في الإذاعة أو يمكنك استخدام الماركدوان</b>",
+                    parse_mode='html',
+                    buttons=buttons
+                )
+            except telethon.errors.rpcerrorlist.MessageNotModifiedError:
+                pass  # تجاهل الخطأ إذا لم يتم تعديل الرسالة
         else:
             await event.answer("❌ ليس لديك صلاحية الوصول إلى هذه الميزة.", alert=True)
     elif event.data == b'enable_maintenance':
@@ -570,11 +580,14 @@ async def callback_handler(event):
                 [Button.inline("تفعيل الصيانه", b'enable_maintenance'), Button.inline("إيقاف الصيانه", b'disable_maintenance')],
                 [Button.inline("📊 إحصائيات البوت", b'stats')]
             ]
-            await event.edit(
-                "<b>• مرحبا عزيزي المطور يمكنك في اوامر البوت الخاص بك عن طريق الازرار التالية 🦾</b>",
-                parse_mode='html',
-                buttons=buttons
-            )
+            try:
+                await event.edit(
+                    "<b>• مرحبا عزيزي المطور يمكنك في اوامر البوت الخاص بك عن طريق الازرار التالية 🦾</b>",
+                    parse_mode='html',
+                    buttons=buttons
+                )
+            except telethon.errors.rpcerrorlist.MessageNotModifiedError:
+                pass  # تجاهل الخطأ إذا لم يتم تعديل الرسالة
         else:
             await event.answer("❌ ليس لديك صلاحية الوصول إلى هذه الميزة.", alert=True)
     elif event.data == b'change_language':
