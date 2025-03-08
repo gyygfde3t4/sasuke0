@@ -12,8 +12,8 @@ import socketserver
 import threading
 import psycopg2
 from psycopg2 import pool
-from psycopg2 import sql  # تمت إضافة هذا الاستيراد
-
+from psycopg2 import sql 
+import sys
 # إعداد بيانات الاعتماد الخاصة بك
 API_ID = os.getenv("API_ID") 
 API_HASH = os.getenv("API_HASH")
@@ -704,11 +704,22 @@ def run_server():
 server_thread = threading.Thread(target=run_server)
 server_thread.start()
 
+
+# تعريف وظيفة إعادة التشغيل الدورية
+async def restart_bot_periodically():
+    while True:
+        await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
+        print("Restarting the bot...")
+        os.execv(sys.executable, [sys.executable] + sys.argv)  # إعادة تشغيل البوت
+
+# بدء الوظيفة الدورية
+asyncio.create_task(restart_bot_periodically())
+
 # بدء تشغيل البوت
 while True:
     try:
         client.start(bot_token=BOT_TOKEN)
-        print("Bot started successfully")
+        print("Bot started successfully!")
         client.run_until_disconnected()
     except Exception as e:
         print(f"Error occurred: {e}")
