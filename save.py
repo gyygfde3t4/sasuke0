@@ -24,7 +24,7 @@ CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # اسم المستخدم لق
 # إعداد بيانات الاعتماد الخاصة بقاعدة البيانات
 
 DATABASE_CONFIG = {
-    'dbname': os.getenv('dbname'),
+    'database': os.getenv('dbname'),
     'user': os.getenv('user'),
     'password': os.getenv('password'),
     'host': os.getenv('host'),
