@@ -12,6 +12,7 @@ import socketserver
 import threading
 import asyncpg
 from asyncpg.pool import Pool
+
 # إعداد بيانات الاعتماد الخاصة بك
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
@@ -19,7 +20,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # اسم المستخدم لقناتك
 
 # إعداد بيانات الاعتماد الخاصة بقاعدة البيانات
-
 DATABASE_CONFIG = {
     'database': os.getenv('dbname'),
     'user': os.getenv('user'),
@@ -28,7 +28,6 @@ DATABASE_CONFIG = {
     'port': os.getenv('port'),
     'ssl': os.getenv('ssl')
 }
-
 
 # تعريف المتغيرات العالمية
 developer_id = int(os.getenv("developer_id"))  # معرف المطور
@@ -40,10 +39,22 @@ user_states = {}  # حالة المستخدمين
 
 # إنشاء Connection Pool
 async def create_db_pool():
-    return await asyncpg.create_pool(**DATABASE_CONFIG)
+    pool = await asyncpg.create_pool(**DATABASE_CONFIG)
+    await create_users_table(pool)
+    return pool
 
-# تعريف المتغير العالمي للـ Connection Pool
-db_pool: Pool = None
+# إنشاء جدول users إذا لم يكن موجودًا
+async def create_users_table(pool):
+    async with pool.acquire() as connection:
+        await connection.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                name TEXT,
+                username TEXT,
+                sessions JSONB,
+                users JSONB
+            )
+        ''')
 
 # تحميل بيانات المستخدمين من قاعدة البيانات
 async def load_users():
@@ -61,6 +72,7 @@ async def save_data(user_id, user_data):
 
 # إنشاء عميل Telethon
 client = TelegramClient('bot_session', API_ID, API_HASH)
+
 
 # التحقق من اشتراك المستخدم في القناة
 async def check_subscription(user_id):
