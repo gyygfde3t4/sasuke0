@@ -24,13 +24,14 @@ CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # اسم المستخدم لق
 # إعداد بيانات الاعتماد الخاصة بقاعدة البيانات
 
 DATABASE_CONFIG = {
-    'dbname': os.getenv('dbname'),
+    'database': os.getenv('dbname'),  # تم التعديل هنا
     'user': os.getenv('user'),
     'password': os.getenv('password'),
     'host': os.getenv('host'),
     'port': os.getenv('port'),
     'ssl': os.getenv('ssl')
 }
+
 
 # تعريف المتغيرات العالمية
 developer_id = int(os.getenv("developer_id"))  # معرف المطور
