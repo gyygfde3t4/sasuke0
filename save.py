@@ -73,7 +73,6 @@ async def save_data(user_id, user_data):
 # إنشاء عميل Telethon
 client = TelegramClient('bot_session', API_ID, API_HASH)
 
-
 # التحقق من اشتراك المستخدم في القناة
 async def check_subscription(user_id):
     try:
@@ -128,23 +127,24 @@ async def show_bot_stats(event):
     stats_message = f"📊 <b>إحصائيات البوت:</b>\n\n👥 <b>عدد المستخدمين:</b> {user_count}\n\n"
 
     for index, (user_id, user_data) in enumerate(users.items(), start=1):
-        # التحقق من وجود البيانات قبل الوصول إليها
         name = user_data.get('name', 'غير معروف')
         username = user_data.get('username', 'بدون يوزر')
         stats_message += f"{index}. {name} (@{username}) - ID: {user_id}\n"
 
-    # إضافة زر الرجوع
     buttons = [
         [Button.inline("رجوع ↩️", b'back_to_main')]
     ]
-    await event.edit(stats_message, parse_mode='html', buttons=buttons)
+
+    # التحقق من أن الرسالة الحالية مختلفة عن الرسالة الجديدة
+    if event.message.message != stats_message:
+        await event.edit(stats_message, parse_mode='html', buttons=buttons)
 
 # إرسال رسالة الأوامر الخاصة بالمطور
 async def send_developer_commands(event):
     buttons = [
-        [Button.inline("إذاعة 📢", b'broadcast')],  # زر الإذاعة في الأعلى
-        [Button.inline("تفعيل الصيانه", b'enable_maintenance'), Button.inline("إيقاف الصيانه", b'disable_maintenance')],  # زر تفعيل وإيقاف الصيانه بجانب بعضهما
-        [Button.inline("📊 إحصائيات البوت", b'stats')]  # زر الإحصائيات في الأسفل
+        [Button.inline("إذاعة 📢", b'broadcast')],
+        [Button.inline("تفعيل الصيانه", b'enable_maintenance'), Button.inline("إيقاف الصيانه", b'disable_maintenance')],
+        [Button.inline("📊 إحصائيات البوت", b'stats')]
     ]
     await event.reply(
         "<b>• مرحبا عزيزي المطور يمكنك في اوامر البوت الخاص بك عن طريق الازرار التالية 🦾</b>",
