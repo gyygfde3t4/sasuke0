@@ -22,6 +22,9 @@ API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # اسم المستخدم لقناتك
+# إعداد Koyeb API
+KOYEB_API_TOKEN = os.getenv("KOYEB_API_TOKEN")  # الحصول على API token من متغيرات البيئة
+SERVICE_ID = os.getenv("SERVICE_ID")  # الحصول على Service ID من متغيرات البيئة
 
 # إعداد اتصال قاعدة البيانات
 db_config = {
@@ -697,31 +700,40 @@ async def handler(event):
         else:
             await event.reply("⚠️ <b>يرجى إدخال رابط صحيح لمنشور من قناة مقيدة.</b>", parse_mode='html')
 
-# تشغيل خادم HTTP على المنفذ 8000
 def run_server():
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", 8000), handler) as httpd:
         print("Serving on port 8000")
         httpd.serve_forever()
 
-# تشغيل وظيفة keep_alive لإرسال طلبات HTTP دورية
-def keep_alive():
-    while True:
-        try:
-            requests.get("https://chronic-eddie-outer-trista-omarkh7aled-db015e23.koyeb.app/")  # استخدم الرابط الصحيح هنا
-        except Exception as e:
-            print(f"Error in keep_alive: {e}")
-        time.sleep(300)  # انتظر 5 دقائق قبل إرسال الطلب التالي
-
 # تشغيل الخادم في خيط جديد
 server_thread = threading.Thread(target=run_server)
-server_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
-server_thread.start()
+server_thread.start()	              
 
-# تشغيل وظيفة keep_alive في خيط منفصل
-keep_alive_thread = threading.Thread(target=keep_alive)
-keep_alive_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
-keep_alive_thread.start()
+
+# وظيفة لإعادة تشغيل الخدمة باستخدام Koyeb API
+async def restart_service():
+    url = f"https://app.koyeb.com/v1/services/{SERVICE_ID}/restart"
+    headers = {
+        "Authorization": f"Bearer {KOYEB_API_TOKEN}"
+    }
+    try:
+        response = requests.post(url, headers=headers)
+        if response.status_code == 200:
+            print("Service restarted successfully.")
+        else:
+            print(f"Failed to restart service: {response.text}")
+    except Exception as e:
+        print(f"Error restarting service: {e}")
+
+# وظيفة دورية لإعادة تشغيل الخدمة كل 15 دقيقة
+async def periodic_restart():
+    while True:
+        await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
+        await restart_service()
+
+# بدء الوظيفة الدورية
+asyncio.create_task(periodic_restart())
 
 # بدء تشغيل البوت
 while True:
@@ -731,4 +743,4 @@ while True:
         client.run_until_disconnected()
     except Exception as e:
         print(f"Error occurred: {e}")
-        continue            
+        continue
