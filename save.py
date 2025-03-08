@@ -10,24 +10,28 @@ from telethon.errors import PhoneCodeExpiredError, SessionPasswordNeededError
 import http.server
 import socketserver
 import threading
-import asyncpg
-from asyncpg.pool import Pool
+import psycopg2
+from psycopg2 import pool
+from psycopg2 import sql
 
 # إعداد بيانات الاعتماد الخاصة بك
-API_ID = os.getenv("API_ID")
+API_ID = os.getenv("API_ID") 
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # اسم المستخدم لقناتك
 
-# إعداد بيانات الاعتماد الخاصة بقاعدة البيانات
-DATABASE_CONFIG = {
-    'database': os.getenv('dbname'),
-    'user': os.getenv('user'),
-    'password': os.getenv('password'),
-    'host': os.getenv('host'),
-    'port': os.getenv('port'),
-    'ssl': os.getenv('ssl')
+# إعداد اتصال قاعدة البيانات
+db_config = {
+    "dbname": os.getenv("dbname"),
+    "user": os.getenv("user"),
+    "password": os.getenv("password"),
+    "host": os.getenv("host"),
+    "port": os.getenv("port"),
+    "sslmode": os.getenv("ssl")
 }
+
+# إنشاء Connection Pool
+connection_pool = psycopg2.pool.SimpleConnectionPool(1, 20, **db_config)
 
 # تعريف المتغيرات العالمية
 developer_id = int(os.getenv("developer_id"))  # معرف المطور
@@ -37,38 +41,73 @@ maintenance_message = ""  # الرسالة التي تظهر أثناء الصي
 language = {}  # تخزين لغة المستخدم
 user_states = {}  # حالة المستخدمين
 
-# إنشاء Connection Pool
-async def create_db_pool():
-    pool = await asyncpg.create_pool(**DATABASE_CONFIG)
-    await create_users_table(pool)
-    return pool
-
-# إنشاء جدول users إذا لم يكن موجودًا
-async def create_users_table(pool):
-    async with pool.acquire() as connection:
-        await connection.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id BIGINT PRIMARY KEY,
+# إنشاء الجدول إذا لم يكن موجودًا
+def create_table_if_not_exists():
+    try:
+        connection = connection_pool.getconn()
+        cursor = connection.cursor()
+        
+        # إنشاء الجدول إذا لم يكن موجودًا
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_accounts (
+                user_id TEXT PRIMARY KEY,
                 name TEXT,
                 username TEXT,
-                sessions JSONB,
-                users JSONB
-            )
-        ''')
+                sessions TEXT,
+                users TEXT
+            );
+        """)
+        connection.commit()
+        print("تم إنشاء الجدول أو التأكد من وجوده.")
+    except Exception as e:
+        print(f"حدث خطأ أثناء إنشاء الجدول: {e}")
+    finally:
+        if connection:
+            connection_pool.putconn(connection)
+
+# استدعاء الدالة لإنشاء الجدول عند بدء التشغيل
+create_table_if_not_exists()
 
 # تحميل بيانات المستخدمين من قاعدة البيانات
-async def load_users():
-    async with db_pool.acquire() as connection:
-        users = await connection.fetch("SELECT * FROM users")
-        return {user['user_id']: user for user in users}
+def load_users():
+    try:
+        connection = connection_pool.getconn()
+        cursor = connection.cursor()
+        cursor.execute("SELECT user_id, name, username, sessions, users FROM user_accounts")
+        users = cursor.fetchall()
+        user_accounts = {user[0]: {"name": user[1], "username": user[2], "sessions": json.loads(user[3]), "users": json.loads(user[4])} for user in users}
+        return user_accounts
+    except Exception as e:
+        print(f"Error loading users: {e}")
+        return {}
+    finally:
+        if connection:
+            connection_pool.putconn(connection)
 
 # حفظ بيانات المستخدمين في قاعدة البيانات
-async def save_data(user_id, user_data):
-    async with db_pool.acquire() as connection:
-        await connection.execute(
-            "INSERT INTO users (user_id, name, username, sessions, users) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id) DO UPDATE SET name = $2, username = $3, sessions = $4, users = $5",
-            int(user_id), user_data['name'], user_data['username'], json.dumps(user_data['sessions']), json.dumps(user_data['users'])
-        )
+def save_data(user_accounts):
+    try:
+        connection = connection_pool.getconn()
+        cursor = connection.cursor()
+        for user_id, data in user_accounts.items():
+            cursor.execute("""
+                INSERT INTO user_accounts (user_id, name, username, sessions, users)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE
+                SET name = EXCLUDED.name,
+                    username = EXCLUDED.username,
+                    sessions = EXCLUDED.sessions,
+                    users = EXCLUDED.users
+            """, (user_id, data["name"], data["username"], json.dumps(data["sessions"]), json.dumps(data["users"])))
+        connection.commit()
+    except Exception as e:
+        print(f"Error saving data: {e}")
+    finally:
+        if connection:
+            connection_pool.putconn(connection)
+
+# تحميل بيانات المستخدمين عند بدء التشغيل
+user_accounts = load_users()
 
 # إنشاء عميل Telethon
 client = TelegramClient('bot_session', API_ID, API_HASH)
@@ -115,36 +154,35 @@ async def countdown(event, info_response, delay, date, views):
             break  # الخروج إذا حدث خطأ مثل حذف الرسالة بالفعل
 
 # وظيفة لحذف الرسائل بعد فترة معينة
-async def delete_messages_later(chat_id, message_ids, delay=60):
+async def delete_messages_later(chat_id, message_ids, delay=60):  
     await asyncio.sleep(delay)
     await client.delete_messages(chat_id, message_ids, revoke=True)
 
 # وظيفة لعرض إحصائيات البوت
 async def show_bot_stats(event):
-    users = await load_users()
+    users = load_users()
     user_count = len(users)
-
+    
     stats_message = f"📊 <b>إحصائيات البوت:</b>\n\n👥 <b>عدد المستخدمين:</b> {user_count}\n\n"
-
+    
     for index, (user_id, user_data) in enumerate(users.items(), start=1):
+        # التحقق من وجود البيانات قبل الوصول إليها
         name = user_data.get('name', 'غير معروف')
         username = user_data.get('username', 'بدون يوزر')
         stats_message += f"{index}. {name} (@{username}) - ID: {user_id}\n"
-
+    
+    # إضافة زر الرجوع
     buttons = [
         [Button.inline("رجوع ↩️", b'back_to_main')]
     ]
-
-    # التحقق من أن الرسالة الحالية مختلفة عن الرسالة الجديدة
-    if event.message.message != stats_message:
-        await event.edit(stats_message, parse_mode='html', buttons=buttons)
+    await event.edit(stats_message, parse_mode='html', buttons=buttons)
 
 # إرسال رسالة الأوامر الخاصة بالمطور
 async def send_developer_commands(event):
     buttons = [
-        [Button.inline("إذاعة 📢", b'broadcast')],
-        [Button.inline("تفعيل الصيانه", b'enable_maintenance'), Button.inline("إيقاف الصيانه", b'disable_maintenance')],
-        [Button.inline("📊 إحصائيات البوت", b'stats')]
+        [Button.inline("إذاعة 📢", b'broadcast')],  # زر الإذاعة في الأعلى
+        [Button.inline("تفعيل الصيانه", b'enable_maintenance'), Button.inline("إيقاف الصيانه", b'disable_maintenance')],  # زر تفعيل وإيقاف الصيانه بجانب بعضهما
+        [Button.inline("📊 إحصائيات البوت", b'stats')]  # زر الإحصائيات في الأسفل
     ]
     await event.reply(
         "<b>• مرحبا عزيزي المطور يمكنك في اوامر البوت الخاص بك عن طريق الازرار التالية 🦾</b>",
@@ -156,13 +194,13 @@ async def send_developer_commands(event):
 async def change_language(event):
     global language
     user_id = event.sender_id
-
+    
     # تغيير اللغة
     if user_id in language and language[user_id] == "en":
         language[user_id] = "ar"
     else:
         language[user_id] = "en"
-
+    
     # إعادة إرسال رسالة الترحيب بناءً على اللغة الجديدة
     await send_welcome_message(event)
 
@@ -170,7 +208,7 @@ async def change_language(event):
 async def send_welcome_message(event):
     user_id = event.sender_id
     sender = await event.get_sender()
-
+    
     if user_id in language and language[user_id] == "en":
         welcome_message = f"""
 👋 Hello {sender.first_name},
@@ -195,7 +233,7 @@ Press /help to learn more.
             [Button.inline("Change language 🇺🇸", b'change_language')],
             [Button.url("المطور", "https://t.me/PP2P6"), Button.url("قناة البوت", f"https://t.me/{CHANNEL_USERNAME[1:]}")]
         ]
-
+    
     try:
         # تعديل الرسالة الحالية
         await event.edit(welcome_message, parse_mode='html', buttons=buttons, link_preview=False)
@@ -218,7 +256,7 @@ async def send_help_message(event):
 - /login لحفظ المحتوى من القنوات المقيدة دون الحاجة إلى رابط دعوة عن طريق تسجيل الدخول إلى حسابك في القناة التي تريد حفظ المحتوى منها.
 - /logout لتسجيل الخروج من حسابك.
         """
-
+    
     try:
         # تعديل الرسالة الحالية
         await event.edit(help_message, parse_mode='html')
@@ -305,16 +343,15 @@ async def login(event):
             user = await user_client.get_me()  # الحصول على معلومات الحساب
 
             # التحقق من أن الحساب غير مضاف مسبقًا
-            user_data = await load_users()
-            if any(str(user.id) in account for account in user_data.get(str(sender_id), {}).get("users", [])):
+            if any(str(user.id) in account for account in user_accounts[sender_id]["users"]):
                 await conv.send_message(f"❌ الحساب {user.first_name} مضاف مسبقًا.")
                 return
 
-            # تحديث بيانات المستخدم
-            user_data = user_data.get(str(sender_id), {})
-            user_data["sessions"] = user_data.get("sessions", []) + [session_str]
-            user_data["users"] = user_data.get("users", []) + [f"{user.id} - {user.first_name}"]
-            await save_data(str(sender_id), user_data)
+            user_accounts[sender_id]["sessions"].append(session_str)
+            user_accounts[sender_id]["users"].append(f"{user.id} - {user.first_name}")  # حفظ ID واسم المستخدم
+
+            # تخزين الجلسات في قاعدة البيانات
+            save_data(user_accounts)
 
             await conv.send_message(f"✔️ تم إضافة الحساب بنجاح: {user.first_name} 🎉")
 
@@ -382,11 +419,10 @@ async def login(event):
 # تسجيل الخروج من الحساب
 async def logout(event):
     sender_id = event.sender_id
-    user_data = await load_users()
-    if str(sender_id) in user_data:
-        user_data[str(sender_id)]["sessions"] = []  # حذف الجلسات
-        user_data[str(sender_id)]["users"] = []  # حذف الحسابات
-        await save_data(str(sender_id), user_data[str(sender_id)])  # حفظ التغييرات
+    if sender_id in user_accounts:
+        user_accounts[sender_id]["sessions"] = []  # حذف الجلسات
+        user_accounts[sender_id]["users"] = []  # حذف الحسابات
+        save_data(user_accounts)  # حفظ التغييرات
         await event.reply("✔️ تم تسجيل الخروج بنجاح.")
     else:
         await event.reply("❌ لم يتم تسجيل الدخول مسبقًا.")
@@ -412,24 +448,23 @@ async def cancel_handler(event):
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     sender = await event.get_sender()
-    sender_id = int(sender.id)  # تحويل إلى عدد صحيح
+    sender_id = str(sender.id)  # تحويل إلى نص لضمان الاتساق
     username = sender.username or "بدون يوزر"
     full_name = f"{sender.first_name} {sender.last_name or ''}".strip()
 
     # التحقق إذا كان المستخدم مسجلًا بالفعل
-    user_data = await load_users()
-    if str(sender_id) not in user_data:
+    if sender_id not in user_accounts:
         # تسجيل المستخدم الجديد مع تخزين الاسم واليوزر
-        user_data[str(sender_id)] = {
+        user_accounts[sender_id] = {
             "name": full_name,
             "username": username,
             "sessions": [],
             "users": []
         }
-        await save_data(str(sender_id), user_data[str(sender_id)])  # حفظ البيانات إلى قاعدة البيانات
+        save_data(user_accounts)  # حفظ البيانات إلى ملف
 
         # إرسال رسالة للمطور عند دخول عضو جديد
-        total_users = len(user_data)  # إجمالي عدد المستخدمين
+        total_users = len(user_accounts)  # إجمالي عدد المستخدمين
         message = (
             f"**☑️| انضم عضو جديد**\n"
             f"━━━━━━━━━━━━━\n"
@@ -554,7 +589,7 @@ async def callback_handler(event):
 @client.on(events.NewMessage())
 async def handler(event):
     global maintenance_mode, maintenance_message
-
+    
     # تجاهل الرسائل التي تبدأ بشرطة مائلة (الأوامر)
     if event.message.message.startswith('/'):
         return
@@ -579,7 +614,7 @@ async def handler(event):
 
     if event.chat_id in broadcast_state and broadcast_state[event.chat_id]:
         # إرسال الرسالة إلى جميع المستخدمين
-        users = await load_users()
+        users = load_users()
         for user_id in users:
             try:
                 await client.send_message(int(user_id), event.message)
@@ -657,15 +692,11 @@ server_thread = threading.Thread(target=run_server)
 server_thread.start()
 
 # بدء تشغيل البوت
-async def main():
-    global db_pool
-    db_pool = await create_db_pool()
-    
-    # بدء تشغيل البوت
-    await client.start(bot_token=BOT_TOKEN)
-    print("Bot started successfully")
-    await client.run_until_disconnected()
-
-# تشغيل الدالة الرئيسية
-if __name__ == "__main__":
-    asyncio.run(main())
+while True:
+    try:
+        client.start(bot_token=BOT_TOKEN)
+        print("Bot started successfully")
+        client.run_until_disconnected()
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        continue
