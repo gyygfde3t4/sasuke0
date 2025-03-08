@@ -705,16 +705,24 @@ server_thread = threading.Thread(target=run_server)
 server_thread.start()
 
 
-# تعريف وظيفة إعادة التشغيل الدورية
-async def restart_bot_periodically():
-    while True:
-        await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
-        print("Restarting the bot...")
-        os.execv(sys.executable, [sys.executable] + sys.argv)  # إعادة تشغيل البوت
+async def main():
+    # بدء البوت
+    await client.start(bot_token=BOT_TOKEN)
+    print("Bot started successfully!")
 
-# بدء الوظيفة الدورية
-asyncio.create_task(restart_bot_periodically())
+    # بدء المهمة الدورية لإعادة التشغيل
+    asyncio.create_task(restart_bot_periodically())
 
+    # تشغيل البوت حتى يتم قطع الاتصال
+    await client.run_until_disconnected()
+
+# تشغيل الدالة الرئيسية
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        
 # بدء تشغيل البوت
 while True:
     try:
