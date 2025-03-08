@@ -695,7 +695,14 @@ async def handler(event):
             await event.reply("⚠️ <b>يرجى إدخال رابط صحيح لمنشور من قناة مقيدة.</b>", parse_mode='html')
 
 
-
+def run_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", 8000), handler) as httpd:
+        print("Serving on port 8000")
+        try:
+            httpd.serve_forever()
+        except Exception as e:
+            print(f"Server error: {e}")
 
 # بدء تشغيل البوت
 while True:
