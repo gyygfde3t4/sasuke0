@@ -694,36 +694,16 @@ async def handler(event):
         else:
             await event.reply("⚠️ <b>يرجى إدخال رابط صحيح لمنشور من قناة مقيدة.</b>", parse_mode='html')
 
-def run_server():
-    handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", 8000), handler) as httpd:
-        print("Serving on port 8000")
-        httpd.serve_forever()
-
-# تشغيل الخادم في خيط جديد
-server_thread = threading.Thread(target=run_server)
-server_thread.start()
 
 
-async def main():
-    # بدء البوت
-    await client.start(bot_token=BOT_TOKEN)
-    print("Bot started successfully!")
 
-    # بدء المهمة الدورية لإعادة التشغيل
-    asyncio.create_task(restart_bot_periodically())
-
-    # تشغيل البوت حتى يتم قطع الاتصال
-    await client.run_until_disconnected()
-
-# تشغيل الدالة الرئيسية
-if __name__ == "__main__":
-    while True:
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(main())
-        except Exception as e:
-            print(f"Error occurred: {e}")
-            loop.close()  # تأكد من إغلاق الحلقة بعد كل خطأ
-            continue
+# بدء تشغيل البوت
+while True:
+    try:
+        client.start(bot_token=BOT_TOKEN)
+        print("Bot started successfully!")
+        client.run_until_disconnected()
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        continue
+       
