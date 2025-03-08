@@ -16,7 +16,7 @@ from psycopg2 import sql
 import sys
 import time
 import requests
-
+import aiohttp
 # إعداد بيانات الاعتماد الخاصة بك
 API_ID = os.getenv("API_ID") 
 API_HASH = os.getenv("API_HASH")
@@ -710,7 +710,6 @@ def run_server():
 server_thread = threading.Thread(target=run_server)
 server_thread.start()	              
 
-
 # وظيفة لإعادة تشغيل الخدمة باستخدام Koyeb API
 async def restart_service():
     url = f"https://app.koyeb.com/v1/services/{SERVICE_ID}/restart"
@@ -718,11 +717,13 @@ async def restart_service():
         "Authorization": f"Bearer {KOYEB_API_TOKEN}"
     }
     try:
-        response = requests.post(url, headers=headers)
-        if response.status_code == 200:
-            print("Service restarted successfully.")
-        else:
-            print(f"Failed to restart service: {response.text}")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers) as response:
+                if response.status == 200:
+                    print("Service restarted successfully.")
+                else:
+                    text = await response.text()
+                    print(f"Failed to restart service: {text}")
     except Exception as e:
         print(f"Error restarting service: {e}")
 
@@ -732,15 +733,19 @@ async def periodic_restart():
         await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
         await restart_service()
 
-# بدء الوظيفة الدورية
-asyncio.create_task(periodic_restart())
+# وظيفة رئيسية لتشغيل البوت
+async def main():
+    # بدء الوظيفة الدورية لإعادة التشغيل التلقائي
+    asyncio.create_task(periodic_restart())
 
-# بدء تشغيل البوت
-while True:
+    # بدء تشغيل البوت
     try:
-        client.start(bot_token=BOT_TOKEN)
+        await client.start(bot_token=BOT_TOKEN)
         print("Bot started successfully!")
-        client.run_until_disconnected()
+        await client.run_until_disconnected()
     except Exception as e:
         print(f"Error occurred: {e}")
-        continue
+
+# تشغيل الوظيفة الرئيسية
+if __name__ == "__main__":
+    asyncio.run(main())
