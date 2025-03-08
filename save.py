@@ -718,17 +718,12 @@ async def main():
 
 # تشغيل الدالة الرئيسية
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        
-# بدء تشغيل البوت
-while True:
-    try:
-        client.start(bot_token=BOT_TOKEN)
-        print("Bot started successfully!")
-        client.run_until_disconnected()
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        continue
+    while True:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(main())
+        except Exception as e:
+            print(f"Error occurred: {e}")
+            loop.close()  # تأكد من إغلاق الحلقة بعد كل خطأ
+            continue
