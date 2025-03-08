@@ -67,7 +67,7 @@ async def save_data(user_id, user_data):
     async with db_pool.acquire() as connection:
         await connection.execute(
             "INSERT INTO users (user_id, name, username, sessions, users) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id) DO UPDATE SET name = $2, username = $3, sessions = $4, users = $5",
-            user_id, user_data['name'], user_data['username'], json.dumps(user_data['sessions']), json.dumps(user_data['users'])
+            int(user_id), user_data['name'], user_data['username'], json.dumps(user_data['sessions']), json.dumps(user_data['users'])
         )
 
 # إنشاء عميل Telethon
@@ -412,21 +412,21 @@ async def cancel_handler(event):
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     sender = await event.get_sender()
-    sender_id = str(sender.id)  # تحويل إلى نص لضمان الاتساق
+    sender_id = int(sender.id)  # تحويل إلى عدد صحيح
     username = sender.username or "بدون يوزر"
     full_name = f"{sender.first_name} {sender.last_name or ''}".strip()
 
     # التحقق إذا كان المستخدم مسجلًا بالفعل
     user_data = await load_users()
-    if sender_id not in user_data:
+    if str(sender_id) not in user_data:
         # تسجيل المستخدم الجديد مع تخزين الاسم واليوزر
-        user_data[sender_id] = {
+        user_data[str(sender_id)] = {
             "name": full_name,
             "username": username,
             "sessions": [],
             "users": []
         }
-        await save_data(sender_id, user_data[sender_id])  # حفظ البيانات إلى قاعدة البيانات
+        await save_data(str(sender_id), user_data[str(sender_id)])  # حفظ البيانات إلى قاعدة البيانات
 
         # إرسال رسالة للمطور عند دخول عضو جديد
         total_users = len(user_data)  # إجمالي عدد المستخدمين
