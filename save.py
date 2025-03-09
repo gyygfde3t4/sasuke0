@@ -706,11 +706,23 @@ def run_server():
 server_thread = threading.Thread(target=run_server)
 server_thread.start()	                
 
-if __name__ == "__main__":
-    while True:
-        try:
-            with client:
-                client.run_until_disconnected()
-        except Exception as e:
-            print(f"حدث خطأ: {e}. إعادة تشغيل البوت...")
-            time.sleep(5)
+
+# بدء تشغيل البوت
+while True:
+    try:
+        # بدء الاتصال بـ Telegram API
+        client.start(bot_token=BOT_TOKEN)
+        print("✅ Bot started successfully")
+
+        # تشغيل البوت حتى يتم قطع الاتصال
+        client.run_until_disconnected()
+
+    except telethon.errors.rpcerrorlist.AuthKeyError:
+        print("❌ خطأ في مفتاح التحقق. يرجى التحقق من API_ID و API_HASH.")
+        break  # إيقاف البوت إذا كان الخطأ متعلقًا بالمفتاح
+
+    except Exception as e:
+        print(f"❌ Error occurred: {e}")
+        print("🔄 إعادة تشغيل البوت بعد 10 ثوانٍ...")
+        time.sleep(10)  # انتظار 10 ثوانٍ قبل إعادة التشغيل
+        continue
