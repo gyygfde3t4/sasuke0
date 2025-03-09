@@ -16,15 +16,11 @@ from psycopg2 import sql
 import sys
 import time
 import requests
-import aiohttp
 # إعداد بيانات الاعتماد الخاصة بك
 API_ID = os.getenv("API_ID") 
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # اسم المستخدم لقناتك
-# إعداد Koyeb API
-KOYEB_API_TOKEN = os.getenv("KOYEB_API_TOKEN")  # الحصول على API token من متغيرات البيئة
-SERVICE_ID = os.getenv("SERVICE_ID")  # الحصول على Service ID من متغيرات البيئة
 
 # إعداد اتصال قاعدة البيانات
 db_config = {
@@ -708,44 +704,13 @@ def run_server():
 
 # تشغيل الخادم في خيط جديد
 server_thread = threading.Thread(target=run_server)
-server_thread.start()	              
+server_thread.start()	                
 
-# وظيفة لإعادة تشغيل الخدمة باستخدام Koyeb API
-async def restart_service():
-    url = f"https://app.koyeb.com/v1/services/{SERVICE_ID}/restart"
-    headers = {
-        "Authorization": f"Bearer {KOYEB_API_TOKEN}"
-    }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers) as response:
-                if response.status == 200:
-                    print("Service restarted successfully.")
-                else:
-                    text = await response.text()
-                    print(f"Failed to restart service: {text}")
-    except Exception as e:
-        print(f"Error restarting service: {e}")
-
-# وظيفة دورية لإعادة تشغيل الخدمة كل 15 دقيقة
-async def periodic_restart():
-    while True:
-        await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
-        await restart_service()
-
-# وظيفة رئيسية لتشغيل البوت
-async def main():
-    # بدء الوظيفة الدورية لإعادة التشغيل التلقائي
-    asyncio.create_task(periodic_restart())
-
-    # بدء تشغيل البوت
-    try:
-        await client.start(bot_token=BOT_TOKEN)
-        print("Bot started successfully!")
-        await client.run_until_disconnected()
-    except Exception as e:
-        print(f"Error occurred: {e}")
-
-# تشغيل الوظيفة الرئيسية
 if __name__ == "__main__":
-    asyncio.run(main())
+    while True:
+        try:
+            with client:
+                client.run_until_disconnected()
+        except Exception as e:
+            print(f"حدث خطأ: {e}. إعادة تشغيل البوت...")
+            time.sleep(5)
