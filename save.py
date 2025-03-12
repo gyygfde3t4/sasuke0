@@ -223,7 +223,7 @@ I am a bot designed to save restricted content. I can save files from restricted
 Press /help to learn more.
 """
         buttons = [
-            [Button.inline("Change language 🇸🇦", b'change_language')],
+            [Button.inline("تغيير اللغة 🇸🇦", b'change_language')],
             [Button.url("Developer", "https://t.me/PP2P6"), Button.url("Bot channel", f"https://t.me/{CHANNEL_USERNAME[1:]}")]
         ]
     else:
